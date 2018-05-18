@@ -5,7 +5,7 @@ Server::Server(QObject *parent) : QTcpServer(parent){}
 
 void Server::startServer()
 {
-    if(this->listen(QHostAddress::Any, 6212))
+    if(this->listen(QHostAddress::Any, 6121))
             qDebug() << "Listening";
     else
             qDebug() << "isnt listening";
