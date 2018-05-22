@@ -5,10 +5,10 @@ Server::Server(QObject *parent) : QTcpServer(parent){}
 
 void Server::startServer()
 {
-    if(this->listen(QHostAddress::Any, 6121))
+    if(this->listen(QHostAddress::Any, 44444))
             qDebug() << "Listening";
     else
-            qDebug() << "isnt listening";
+            qDebug() << "Not listening";
 }
 void Server::incomingConnection(int socketDescriptor)
 {
@@ -16,8 +16,7 @@ void Server::incomingConnection(int socketDescriptor)
     clientSocket->setSocketDescriptor(socketDescriptor);
     clients.insert(clientSocket);
 
-    qDebug() <<"New client has joined to chat from: "
-             << clientSocket->peerAddress().toString();
+    qDebug() <<"Client connected ";
 
     connect(clientSocket, SIGNAL(readyRead()),
             this,         SLOT(readyRead()));
@@ -37,9 +36,11 @@ void Server::readyRead()
 {    
     clientSocket = (QTcpSocket*)sender();
     while(clientSocket->canReadLine()){
-        QString line = QString::fromUtf8(clientSocket->readLine());    
-        doc = QJsonDocument::fromJson(line.toUtf8(), &docError);
+        QString line = QString::fromUtf8(clientSocket->readLine());
         qDebug() << "Read line: " << line;
+
+        doc = QJsonDocument::fromJson(line.toUtf8(), &docError);
+
         if (docError.errorString().toInt() == QJsonParseError::NoError){
 
             if (doc.object().value("type").toString() == "user_name")
@@ -49,19 +50,19 @@ void Server::readyRead()
                      qDebug() << "wrong username: is already exist";
                      clientSocket->write(QString("{\"type\":\"wrong_name\"}\n").toUtf8());
                      clients.remove(clientSocket);
+                     users.remove(clientSocket);
+                     clientSocket->close();
                      return;
                 }
                 QString user = line;
                 users[clientSocket] = doc.object().value("user_name").toString();
                 foreach(QTcpSocket *client, clients)
                 {
-                    if(client == clientSocket)
-                        client->write(QString("{\"type\":\"message_from_server\",\"message\":\"Welcome to chat, " + doc.object().value("user_name").toString() + "!\"}\n").toUtf8());
-                    else
+                    if(client != clientSocket)
                         client->write(QString("{\"type\":\"message_from_server\",\"message\":\"" + doc.object().value("user_name").toString() + " has joined.\"}\n").toUtf8());
                 }
                 sendUsersList();
-                qDebug() << doc.object().value("user_name").toString() << " connected";
+                qDebug() << "login: \"" << doc.object().value("user_name").toString() << "\"";
             }
             else if(users.contains(clientSocket))
             {
@@ -73,12 +74,13 @@ void Server::readyRead()
             }
             else
             {
-                qWarning() << "Got bad message from client:" << clientSocket->peerAddress().toString() << line;
+                qWarning() << "Got bad message from client:" << users[clientSocket] << line;
             }
 
         }
-
     }
+
+
 }
 
 void Server::disconnected()
@@ -87,7 +89,6 @@ void Server::disconnected()
     if(clients.contains(clientSocket))
     {
         qDebug() << users[clientSocket] << " disconnected";
-        clientSocket->write(QString("{\"type\":\"message_from_server\",\"message\":\"You are disconnected from server\"}\n").toUtf8());
         clients.remove(clientSocket);
 
         QString user = users[clientSocket];
@@ -96,6 +97,7 @@ void Server::disconnected()
         sendUsersList();
         foreach(QTcpSocket *client, clients)
             client->write(QString("{\"type\":\"message_from_server\",\"message\":\"" + user + " has left.\"}\n").toUtf8());
+
     }
 }
 

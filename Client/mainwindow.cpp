@@ -32,8 +32,8 @@ MainWindow::~MainWindow()
 void MainWindow::readyRead()
 {
 
-   while(socket->canReadLine())
-   {
+    while(socket->canReadLine()){
+
        QString line = QString::fromUtf8(socket->readLine().trimmed());
        doc = QJsonDocument::fromJson(line.toUtf8(), &docError);
        if (docError.errorString().toInt() == QJsonParseError::NoError){
@@ -43,10 +43,11 @@ void MainWindow::readyRead()
                ui->roomsTextEdit->append("<b>" + user +"</b>: " + message);
            }
            else if(doc.object().value("type").toString() == "wrong_name"){
-               QMessageBox::information(this, "Error", "That name is already taken");
+               ui->roomsTextEdit->append("Login error");
+               QMessageBox::information(this, "Error", "This name has already taken");
                ui->loginButton->setText("Connect");
                isConnected = false;
-               ui->roomsTextEdit->append("You are disconnected from server");
+
                ui->loginLineEdit->setDisabled(false);
                ui->usersTextEdit->clear();
            }
@@ -64,7 +65,7 @@ void MainWindow::readyRead()
            }
        }
 
-   }
+    }
 
 }
 
@@ -80,20 +81,21 @@ void MainWindow::on_loginButton_clicked()
     else { 
 
         if(!isConnected){
-            socket->connectToHost("192.168.3.100", 56343);
-            if(socket->waitForConnected(200))
+            socket->connectToHost("127.0.0.1", 44444);
+            if(socket->waitForConnected(500))
             {
                 isConnected = true;
                 ui->loginButton->setText("Disconnect");
                 socket->write(QString("{\"type\":\"user_name\",\"user_name\":\"" + ui->loginLineEdit->text() + "\"}\n").toUtf8());
                 ui->loginLineEdit->setDisabled(true);
+                ui->roomsTextEdit->append("Welcome to the chat room, " + ui->loginLineEdit->text() + "!");
             }
             else{
                 QMessageBox::information(this, "Error", "Failed to connect to server");
             }
         }
         else{
-            socket->disconnectFromHost();
+            socket->close();
         }
 
     }
@@ -104,13 +106,13 @@ void MainWindow::on_sendButton_clicked()
         QString message = ui->lineEdit->text().trimmed();
         if(!message.isEmpty())
         {
-            socket->write(QString(message + "\"}\n").toUtf8());
+            socket->write(QString(message +"\"}\n").toUtf8());
         }
         ui->lineEdit->clear();
         ui->lineEdit->setFocus();
     }
     else{
-        QMessageBox::information(this, "Error", "Connetion failed");
+        QMessageBox::information(this, "Error", "Failed to connect to server");
 
     }
 }
@@ -120,7 +122,7 @@ void MainWindow::disconnected()
     socket->close();
     ui->loginButton->setText("Connect");
     isConnected = false;
-    ui->roomsTextEdit->append("You are disconnected from server");
+    ui->roomsTextEdit->append("You have been disconnected from the server");
     ui->loginLineEdit->setDisabled(false);
     ui->usersTextEdit->clear();
 }
